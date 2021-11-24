@@ -1,7 +1,6 @@
 name: Update
 
 on:
-on:
   schedule:
     - cron: "15 15 * * *"
     - cron: "15 17 * * *"
