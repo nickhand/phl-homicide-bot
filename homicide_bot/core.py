@@ -1,15 +1,43 @@
 from datetime import datetime
 
-import numpy as np
+import holidays
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
+from dateutil.easter import easter
 from loguru import logger
 
 from . import DATA_DIR
 
 NOW = datetime.now()
 CURRENT_WEEKDAY = NOW.weekday()
+CURRENT_YEAR = NOW.year
+
+
+def get_holidays():
+    """Get holidays."""
+
+    # PA holidays this year
+    x = holidays.US(state="PA", years=CURRENT_YEAR)
+    names = [
+        "New Year's Day",
+        "Martin Luther King Jr. Day",
+        "Washington's Birthday",
+        "Memorial Day",
+        "Juneteenth National Independence Day",
+        "Independence Day",
+        "Labor Day",
+        "Columbus Day",
+        "Veterans Day",
+        "Thanksgiving",
+        "Christmas Day",
+    ]
+    h = {v: k for k, v in x.items() if v in names}
+
+    # Add easter
+    h["Good Friday"] = (easter(CURRENT_YEAR) + pd.DateOffset(days=-2)).date()
+
+    return h
 
 
 def load_historic_data():
@@ -36,14 +64,18 @@ def check_for_update(dry_run=False):
 
     # check datetime
     date = table.select("tbody")[0].select_one("td").text.split("\n")[0]
-    date = pd.to_datetime(date + " 11:59:00")
+    date = pd.to_datetime(date).date()
 
     # Skip weekend updates
     # Don't run if as of date is Friday or Saturday at midnight
     AS_OF_WEEKDAY = date.weekday()
     if AS_OF_WEEKDAY in [4, 5]:
         return
-    print(AS_OF_WEEKDAY)
+
+    # Skip holidays too!
+    today_is_holiday = NOW.date() in get_holidays().values()
+    if today_is_holiday:
+        return
 
     # historic
     historic = load_historic_data()
@@ -59,19 +91,22 @@ def check_for_update(dry_run=False):
 
     # Check if we need to update
     YTD = homicides[0]
-    fdate = date.strftime("%b %-d, %Y")
-    if latest_historic["date"] < date:
+    fdate = date.strftime("%A %b. %-d, %Y")
+    if latest_historic["date"].date() < date:
 
         messages = []
         change = YTD - latest_historic["total"]
 
         # Figure out the previous comparison date
-        if AS_OF_WEEKDAY == 6:
-            previous_date = date - pd.DateOffset(days=2)
-            previous_fdate = previous_date.strftime("%b %-d, %Y")
-            comparison_string = f"since Friday {previous_fdate}"
-        else:
+        comparison_date = latest_historic["date"]
+
+        # Only one day has elapsed
+        if (comparison_date + pd.DateOffset(days=1)).date() == date:
             comparison_string = f"on {fdate}"
+        # More than one day has passed
+        else:
+            previous_fdate = comparison_date.strftime("%A %b. %-d, %Y")
+            comparison_string = f"since {previous_fdate}"
 
         # Figure out how to state change in homicides
         if change == 1:
@@ -86,8 +121,9 @@ def check_for_update(dry_run=False):
         messages.append(message)
 
         # Create YTD message
+        fdate2 = date.strftime("%b. %-d, %Y")
         messages.append(
-            f"As of 11:59 PM on {fdate}, there have been {YTD} homicides in Philadelphia,"
+            f"As of 11:59 PM on {fdate2}, there have been {YTD} homicides in Philadelphia,"
         )
 
         # Check historic max

@@ -14,6 +14,7 @@ requests = "^2.26.0"
 click = "^8.0.3"
 python-dotenv = "^0.19.2"
 loguru = "^0.5.3"
+holidays = "^0.11.3"
 
 [tool.poetry.dev-dependencies]
 black = "^21.11b1"
