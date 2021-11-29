@@ -64,7 +64,8 @@ def check_for_update(dry_run=False):
 
     # check datetime
     date = table.select("tbody")[0].select_one("td").text.split("\n")[0]
-    date = pd.to_datetime(date).date()
+    date_dt = pd.to_datetime(date)
+    date = date_dt.date()
 
     # Skip weekend updates
     # Don't run if as of date is Friday or Saturday at midnight
@@ -105,6 +106,11 @@ def check_for_update(dry_run=False):
             comparison_string = f"on {fdate}"
         # More than one day has passed
         else:
+
+            # Get the next day
+            comparison_date = comparison_date + pd.DateOffset(days=1)
+
+            # Get the string
             previous_fdate = comparison_date.strftime("%A %b. %-d, %Y")
             comparison_string = f"since {previous_fdate}"
 
@@ -121,9 +127,8 @@ def check_for_update(dry_run=False):
         messages.append(message)
 
         # Create YTD message
-        fdate2 = date.strftime("%b. %-d, %Y")
         messages.append(
-            f"As of 11:59 PM on {fdate2}, there have been {YTD} homicides in Philadelphia,"
+            f"As of 11:59 PM on {fdate}, there have been {YTD} homicides in Philadelphia,"
         )
 
         # Check historic max
@@ -142,7 +147,7 @@ def check_for_update(dry_run=False):
 
         # Save!
         if not dry_run:
-            historic.loc[len(historic)] = [date, YTD]
+            historic.loc[len(historic)] = [date_dt, YTD]
             historic.to_csv(DATA_DIR / "homicide_totals_daily.csv", index=False)
 
         return messages
