@@ -57,6 +57,7 @@ def check_for_update(dry_run=False):
     # Get the table
     table = soup.select_one("#homicide-stats")
     if table is None:
+        print(soup.prettify())
         raise ValueError("No table found to scrape")
 
     # Year comparison
