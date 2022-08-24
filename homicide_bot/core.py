@@ -1,37 +1,16 @@
 from datetime import datetime
 
+import cloudscraper
 import holidays
 import pandas as pd
+from bs4 import BeautifulSoup
 from dateutil.easter import easter
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
-from webdriver_manager.chrome import ChromeDriverManager
 
 from . import DATA_DIR
 
 NOW = datetime.now()
 CURRENT_WEEKDAY = NOW.weekday()
 CURRENT_YEAR = NOW.year
-
-
-def get_webdriver(debug=False):
-    """
-    Initialize a selenium web driver with the specified options.
-    """
-    # Create the options
-    options = webdriver.ChromeOptions()
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-extensions")
-    options.add_argument("--disable-gpu")
-    if not debug:
-        options.add_argument("--headless")
-
-    # Initialize
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=options)
-
-    return driver
 
 
 def get_holidays():
@@ -70,30 +49,24 @@ def load_historic_data():
 def check_for_update(dry_run=False):
     """Check for updates"""
 
+    # Initialize the scraper
+    scraper = cloudscraper.create_scraper()
+
     # Parse the website
     url = "https://www.phillypolice.com/crime-maps-stats/"
-    driver = get_webdriver()
-    driver.get(url)
-
-    print(driver.page_source)
+    soup = BeautifulSoup(scraper.get(url).content, "lxml")
 
     # Get the table
-    table = driver.find_element(By.CSS_SELECTOR, "#homicide-stats")
+    table = soup.select_one("#homicide-stats")
+    if table is None:
+        print(soup.prettify())
+        raise ValueError("No table found to scrape")
 
     # Year comparison
-    years = [
-        int(td.text)
-        for td in table.find_element(By.CSS_SELECTOR, "tr").find_elements(
-            By.CSS_SELECTOR, "th"
-        )[1:]
-    ]
+    years = [int(td.text) for td in table.find("tr").find_all("th")[1:]]
 
     # check datetime
-    date = (
-        table.find_elements(By.CSS_SELECTOR, "tbody")[0]
-        .find_element(By.CSS_SELECTOR, "td")
-        .text.split("\n")[0]
-    )
+    date = table.select("tbody")[0].select_one("td").text.split("\n")[0]
     date_dt = pd.to_datetime(date)
     date = date_dt.date()
 
@@ -113,17 +86,8 @@ def check_for_update(dry_run=False):
     latest_historic = historic.iloc[-1]
 
     # Get homicides
-    homicides = [
-        table.find_elements(By.CSS_SELECTOR, "tbody")[0]
-        .find_elements(By.CSS_SELECTOR, ".homicides-count")[0]
-        .text
-    ]
-    homicides += [
-        td.text
-        for td in table.find_elements(By.CSS_SELECTOR, "tbody")[0].find_elements(
-            By.CSS_SELECTOR, "td"
-        )[2:-1]
-    ]
+    homicides = [table.select("tbody")[0].select(".homicides-count")[0].text]
+    homicides += [td.text for td in table.select("tbody")[0].find_all("td")[2:-1]]
     homicides = list(map(int, homicides))
 
     if len(homicides) != len(years):

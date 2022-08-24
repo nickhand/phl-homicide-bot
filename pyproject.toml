@@ -15,8 +15,7 @@ click = "^8.0.3"
 python-dotenv = "^0.19.2"
 loguru = "^0.5.3"
 holidays = "^0.11.3"
-selenium = "^4.4.3"
-webdriver-manager = "^3.8.3"
+cloudscraper = "^1.2.60"
 
 [tool.poetry.dev-dependencies]
 black = "^21.11b1"
