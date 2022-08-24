@@ -75,6 +75,8 @@ def check_for_update(dry_run=False):
     driver = get_webdriver()
     driver.get(url)
 
+    print(driver.page_source)
+
     # Get the table
     table = driver.find_element(By.CSS_SELECTOR, "#homicide-stats")
 
